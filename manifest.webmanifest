@@ -1,0 +1,15 @@
+{
+  "name": "Helo Sweep Width",
+  "short_name": "Sweep Width",
+  "description": "Helicopter maritime sweep width lookup (Table 1-6(1), 500 and 1000 ft).",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1219",
+  "theme_color": "#0b1219",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
