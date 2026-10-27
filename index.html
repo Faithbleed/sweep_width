@@ -65,6 +65,8 @@ th{font:600 .75rem var(--display);letter-spacing:.08em;color:var(--muted);text-t
 td:first-child,th:first-child{text-align:left;font-family:var(--display);font-size:.85rem;font-weight:600;color:var(--muted)}
 tr:last-child td{border-bottom:0}
 td{border-radius:6px}
+.maplink{font:600 .95rem var(--body);color:var(--accent-ink);background:var(--accent);text-decoration:none;border-radius:999px;padding:9px 14px;white-space:nowrap}
+header>div{display:flex;flex-direction:column;gap:2px}
 .note{font-size:.8rem;color:var(--muted);margin:0}
 .fallback{display:block;font-size:.85rem;color:var(--accent);font-weight:600}
 body:has(input) .fallback{display:none}
@@ -121,7 +123,7 @@ body:has(#a1:checked):has(#v5:checked) .x15{display:block}
 body:has(#a1:checked):has(#v5:checked) .t15{background:var(--hi);color:var(--accent);font-weight:700}</style>
 </head><body>
 <div class="wrap">
-  <header><h1>Helo Sweep Width</h1><span class="tag">TBL 1-6(1) · MARITIME</span></header>
+  <header><div><h1>Helo Sweep Width</h1><span class="tag">TBL 1-6(1) · MARITIME</span></div><a class="maplink" href="map.html">Drift &amp; tide map ›</a></header>
   <div class="readout">
     <span class="lbl">Uncorrected sweep width (W)</span>
     <span class="fallback">This viewer is too old to run the calculator. Open the file in Safari or Chrome, or use the full table below each selection.</span>

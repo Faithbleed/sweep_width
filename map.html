@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sweep Width">
+<meta name="theme-color" content="#eef1f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1219" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>Drift &amp; Tide · Helo Sweep Width</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="map.css">
+<script src="config.js"></script>
+</head>
+<body>
+<header class="bar">
+  <a class="back" href="./">‹ Sweep</a>
+  <h1>Drift &amp; Tide</h1>
+  <div class="bar-actions">
+    <button type="button" id="btn-pos" class="pill">Position</button>
+    <button type="button" id="btn-loc" class="pill" aria-label="Use my location">◎</button>
+  </div>
+</header>
+
+<div id="map" role="application" aria-label="Map. Tap the sea to set the last known position."></div>
+
+<section id="sheet" class="sheet">
+  <button type="button" id="sheet-toggle" class="grab" aria-expanded="true" aria-controls="sheet-body"><span></span></button>
+  <div id="sheet-empty" class="empty">
+    <strong>Tap the sea to set the last known position.</strong>
+    <span>Or use <em>Position</em> to type coordinates from RCC, or ◎ for your own position.</span>
+  </div>
+  <div id="sheet-body" hidden>
+    <div class="pos-row">
+      <div>
+        <div class="lbl">Last known position</div>
+        <div id="pos-ddm" class="pos"></div>
+        <div id="pos-dec" class="sub"></div>
+      </div>
+      <button type="button" id="btn-copy" class="pill small">Copy</button>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-drift" aria-selected="true" aria-controls="panel-drift">Drift</button>
+      <button type="button" role="tab" id="tab-tide" aria-selected="false" aria-controls="panel-tide">Tide</button>
+    </div>
+
+    <div id="panel-drift" role="tabpanel" aria-labelledby="tab-drift">
+      <div class="form">
+        <label class="f wide"><span class="lbl">Search object</span><select id="obj"></select></label>
+        <label class="f"><span class="lbl">Last seen</span><input type="datetime-local" id="t0"></label>
+        <label class="f"><span class="lbl">Drift for</span>
+          <select id="hours">
+            <option value="1">1 h</option><option value="2">2 h</option><option value="3">3 h</option>
+            <option value="6" selected>6 h</option><option value="12">12 h</option><option value="24">24 h</option><option value="48">48 h</option>
+          </select>
+        </label>
+      </div>
+      <div id="drift-status" class="status" aria-live="polite"></div>
+      <div id="drift-out" hidden>
+        <div class="result">
+          <div class="lbl" id="res-title">Drift after 6 h</div>
+          <div class="big"><span class="v" id="res-dist">–</span><span class="u">NM</span><span class="dir" id="res-brg">–</span></div>
+          <div class="sub" id="res-detail"></div>
+        </div>
+        <div class="grid3">
+          <div class="cond"><div class="lbl">Wind</div><div class="cv" id="c-wind">–</div><div class="sub" id="c-wind2"></div></div>
+          <div class="cond"><div class="lbl">Current</div><div class="cv" id="c-cur">–</div><div class="sub" id="c-cur2"></div></div>
+          <div class="cond"><div class="lbl">Leeway</div><div class="cv" id="c-lee">–</div><div class="sub" id="c-lee2"></div></div>
+        </div>
+        <div class="sub" id="c-when"></div>
+        <table class="pts" id="pts"></table>
+        <div class="legend">
+          <span><i class="sw sw-area"></i>Drift area (left–right leeway)</span>
+          <span><i class="sw sw-cur"></i>Current only</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-tide" role="tabpanel" aria-labelledby="tab-tide" hidden>
+      <div id="tide-status" class="status" aria-live="polite"></div>
+      <div id="linz" class="block"></div>
+      <div id="model" class="block"></div>
+    </div>
+
+    <p class="fine">Estimates for situational awareness only. They do not replace RCCNZ drift modelling or SAR planning tools. Leeway: US Coast Guard coefficients (Allen 2005) via OpenDrift. Currents, waves, modelled tide and wind: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (Météo-France SMOC, ~8 km grid). Official tides: Toitū Te Whenua LINZ, CC BY 4.0.</p>
+  </div>
+</section>
+
+<dialog id="dlg-pos">
+  <form method="dialog" id="form-pos">
+    <h2>Enter position</h2>
+    <label for="pos-in" class="lbl">Latitude, longitude</label>
+    <input id="pos-in" autocomplete="off" inputmode="text" placeholder="41 17.40S 174 46.80E">
+    <p class="sub">Examples: <code>41 17.40S 174 46.80E</code> · <code>-41.29, 174.78</code> · <code>43 57.5S, 176 33.0W</code></p>
+    <p id="pos-err" class="err" hidden>Couldn't read that position. Use degrees and minutes with N/S and E/W, or decimal degrees separated by a comma.</p>
+    <div class="dlg-actions">
+      <button type="button" class="pill" id="pos-cancel">Cancel</button>
+      <button type="submit" class="pill primary" id="pos-ok">Set position</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="map.js"></script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(function(){});}</script>
+</body>
+</html>

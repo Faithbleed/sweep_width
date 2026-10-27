@@ -1,45 +1,68 @@
 # Helo Sweep Width
 
-Helicopter maritime sweep width lookup, from Table 1-6(1) Sweep Widths for Helicopters (NM), 500 ft and 1000 ft.
-Installs to the iPhone home screen and works offline after the first open.
+A web app for helicopter maritime search. Open the address in any phone browser: there's nothing to install.
 
-## Files
+- **Sweep** (`index.html`): sweep widths from Table 1-6(1) Sweep Widths for Helicopters (NM), 500 ft and 1000 ft.
+- **Drift & tide map** (`map.html`): tap the sea, or type the position from RCC, to set the last known position (LKP). The map then shows:
+  - **Drift:** projected drift for the chosen search object from the last-seen time, drawn as an area between the left and right leeway solutions, with hourly positions, plus a current-only line.
+  - **Wind, current and waves** at the LKP.
+  - **Official LINZ tide** times and heights for the nearest standard port.
+  - **Modelled tide curve** at the exact point.
+
+## What's in the folder
 
 | File | What it is |
 |---|---|
-| index.html | The calculator |
-| manifest.webmanifest | App name, icon and full-screen settings |
-| sw.js | Saves the app on the phone so it works without signal |
-| icon-180.png, icon-192.png, icon-512.png | Home-screen icons |
+| index.html | Sweep width calculator |
+| map.html, map.js, map.css | Drift & tide map |
+| calc.js | Drift, tide and position maths |
+| leeway.js | Leeway coefficients for each search object |
+| config.js | Settings (optional LINZ aerial imagery key) |
+| vendor/ | Leaflet map library (BSD licence) |
+| tools/fetch_linz_tides.py, .github/workflows/linz-tides.yml | Monthly job that downloads the official LINZ tide tables into `tides/` |
+| setup/linz-tides.yml | Visible copy of the workflow file, for step 4 below |
+| sw.js, manifest.webmanifest, icon-*.png | Faster loading and home-screen icon |
 
-## Put it online (once, about 5 minutes, free)
+## Put it online (once, about 10 minutes, free)
 
-Easiest on a computer, but it also works from Safari on an iPhone.
+Do this on a computer.
 
-1. Create a free account at github.com.
-2. Tap **+** (top right) > **New repository**. Name it `sweep-width`, set it to **Public**, tick **Add a README file**, and tap **Create repository**.
-3. Tap **Add file** > **Upload files**. Select all six files above (not the zip, and not this README) and tap **Commit changes**.
-4. Go to **Settings** > **Pages**. Under "Branch", choose **main** and **/ (root)**, then tap **Save**.
-5. Wait a minute or two, then refresh that Settings > Pages screen. It shows your web address, which looks like
-   `https://YOUR-USERNAME.github.io/sweep-width/`
+1. Create a free account at github.com. Click **+** > **New repository**, name it `sweep-width`, choose **Public**, and click **Create repository**.
+2. Click **uploading an existing file**. Drag in everything inside the `helo-sweep-width` folder, including the `vendor`, `tools` and `setup` folders, then click **Commit changes**.
+3. Go to **Settings** > **Pages**. Under "Branch", choose **main** and **/ (root)**, then click **Save**. After a minute or two the page shows your address, for example `https://YOUR-USERNAME.github.io/sweep-width/`.
+4. **Turn on official LINZ tides.** Mac and Windows hide the `.github` folder, so create its one file by hand:
+   - In the repository, click **Add file** > **Create new file**.
+   - In the name box, type `.github/workflows/linz-tides.yml`.
+   - Open `setup/linz-tides.yml` from the folder, copy all of it, paste it in, and click **Commit changes**.
+   - Go to the **Actions** tab. "Update LINZ tide predictions" runs automatically and takes about a minute. When it shows a green tick, a `tides` folder appears in the repository and the map shows official port tides.
+   - It then runs again on the 1st of each month to stay current. To run it by hand, open it on the Actions tab and click **Run workflow**.
+5. Optional: to add the LINZ aerial imagery layer, put a LINZ Basemaps key into `config.js` (click the file, then the pencil icon to edit). See the note in that file.
 
-That address is what you send to the crew.
+Send the address to the crew. The map is at the same address with `map.html` on the end, and the calculator links to it.
 
-## Install on an iPhone (each person, once)
+## Where the data comes from
 
-1. Open the address in **Safari**. Wait for the page to load fully, with signal.
-2. Tap **Share** (the square with an up arrow) > **Add to Home Screen** > **Add**.
-3. Open it once from the new icon while you still have signal. After that it works offline.
+| Data | Source | Notes |
+|---|---|---|
+| Ocean current, waves, modelled tide | Open-Meteo Marine API, using Météo-France SMOC (~8 km grid, includes tidal currents) | Live forecast at every tap. Unreliable close inshore and inside harbours. |
+| Wind (10 m) | Open-Meteo forecast API | Live forecast. |
+| Official tides | Toitū Te Whenua LINZ standard port predictions, CC BY 4.0 | Copied monthly by the GitHub job. Times are port local time, heights are above chart datum. |
+| Leeway | US Coast Guard coefficients (Allen & Plourde 1999; Allen 2005), as tabulated in OpenDrift | The same empirical basis as IAMSAR leeway tables. |
+| Map | OpenStreetMap, OpenSeaMap seamarks, optional LINZ aerial | |
 
-On Android, open the address in Chrome and tap **Install app** or **Add to Home screen**.
+Open-Meteo is free for non-commercial use. If your organisation counts as commercial use, it needs an Open-Meteo API subscription.
 
-## Updating the table later
+## How the drift is worked out
 
-1. On GitHub, open the file to change, tap the pencil icon, edit it, and commit. Or upload a replacement file.
-2. In `sw.js`, change `sweep-v1` to `sweep-v2` (then `v3`, and so on) and commit. This tells every phone to fetch the new version.
-3. Phones pick up the update the next time the app opens with signal. Closing and reopening it a second time shows the new version.
+Every 10 minutes from the last-seen time, the object moves with the surface current plus leeway. Leeway is the downwind push (a percentage of the 10 m wind plus an offset) and the crosswind push to the left or right, using that object's coefficients. Running the left and right versions separately gives the two edges of the drift area. Forecasts are sampled at the LKP only, so changes in current along the track are not included.
+
+**This is for situational awareness only. It does not replace RCCNZ drift modelling (SAROPS) or your SAR planning procedures.** It does not include survivor movement, error in the reported position, or forecast uncertainty.
+
+## Updating
+
+- Edit any file on GitHub with the pencil icon, or upload a replacement.
+- After changing any file, also change `sweep-v2` in `sw.js` to the next number (`sweep-v3`, and so on). This makes phones fetch the new version instead of using their saved copy.
 
 ## Important
 
-Values were transcribed from a photo of the table. Check them against the source document before operational use.
-W shown is uncorrected. Apply your weather, fatigue and speed correction factors before setting track spacing.
+The sweep width values were transcribed from a photo of the table. Check them against the source document before operational use.
