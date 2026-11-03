@@ -84,13 +84,6 @@ select,input{font:500 1rem var(--body);color:var(--fg);background:var(--chip);bo
 .ev .tm{font:700 1rem var(--mono)}
 .ev .h{font-size:.8rem;color:var(--muted)}
 .ev .past{opacity:.55}
-.tchart{width:100%;height:auto;display:block;margin-top:8px}
-.tchart text{font:11px var(--body);fill:var(--muted)}
-.tchart .curve{fill:none;stroke:var(--cur);stroke-width:2.5}
-.tchart .fill{fill:color-mix(in srgb,var(--cur) 14%,transparent)}
-.tchart .grid{stroke:var(--line);stroke-width:1}
-.tchart .now{stroke:var(--accent);stroke-width:2}
-.tchart .lab{fill:var(--fg);font-weight:600}
 .warnline{color:var(--warn);font-size:.85rem;font-weight:600;margin-top:6px}
 .fine{font-size:.72rem;color:var(--muted);line-height:1.45;margin:12px 0 0}
 .fine a{color:inherit}

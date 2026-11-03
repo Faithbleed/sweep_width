@@ -6,8 +6,7 @@ A web app for helicopter maritime search. Open the address in any phone browser:
 - **Drift & tide map** (`map.html`): tap the sea, or type the position from RCC, to set the last known position (LKP). The map then shows:
   - **Drift:** projected drift for the chosen search object from the last-seen time, drawn as an area between the left and right leeway solutions, with hourly positions, plus a current-only line.
   - **Wind, current and waves** at the LKP.
-  - **Official LINZ tide** times and heights for the nearest standard port.
-  - **Modelled tide curve** at the exact point.
+  - **LINZ tide** times and heights for the nearest LINZ tide point. That's either a port with its own daily LINZ predictions, or a LINZ secondary port worked out from its standard port with LINZ's published differences.
 
 ## What's in the folder
 
@@ -19,7 +18,7 @@ A web app for helicopter maritime search. Open the address in any phone browser:
 | leeway.js | Leeway coefficients for each search object |
 | config.js | Settings (optional LINZ aerial imagery key) |
 | vendor/ | Leaflet map library (BSD licence) |
-| tools/fetch_linz_tides.py, .github/workflows/linz-tides.yml | Monthly job that downloads the official LINZ tide tables into `tides/` |
+| tools/fetch_linz_tides.py, .github/workflows/linz-tides.yml | Monthly job that copies the LINZ tide tables into `tides/` (see below) |
 | setup/linz-tides.yml | Visible copy of the workflow file, for step 4 below |
 | sw.js, manifest.webmanifest, icon-*.png | Faster loading and home-screen icon |
 
@@ -44,13 +43,23 @@ Send the address to the crew. The map is at the same address with `map.html` on 
 
 | Data | Source | Notes |
 |---|---|---|
-| Ocean current, waves, modelled tide | Open-Meteo Marine API, using Météo-France SMOC (~8 km grid, includes tidal currents) | Live forecast at every tap. Unreliable close inshore and inside harbours. |
+| Ocean current and waves | Open-Meteo Marine API, using Météo-France SMOC (~8 km grid, includes tidal currents) | Live forecast at every tap. Unreliable close inshore and inside harbours. |
 | Wind (10 m) | Open-Meteo forecast API | Live forecast. |
-| Official tides | Toitū Te Whenua LINZ standard port predictions, CC BY 4.0 | Copied monthly by the GitHub job. Times are port local time, heights are above chart datum. |
+| Tides | Toitū Te Whenua LINZ daily port predictions and the LINZ secondary ports table, CC BY 4.0 | Copied monthly by the GitHub job. Secondary ports use the LINZ Nautical Almanac method. Times are port local time, heights are above chart datum. |
 | Leeway | US Coast Guard coefficients (Allen & Plourde 1999; Allen 2005), as tabulated in OpenDrift | The same empirical basis as IAMSAR leeway tables. |
 | Map | OpenStreetMap, OpenSeaMap seamarks, optional LINZ aerial | |
 
 Open-Meteo is free for non-commercial use. If your organisation counts as commercial use, it needs an Open-Meteo API subscription.
+
+## The monthly LINZ tide job
+
+LINZ publishes its tide predictions as yearly files on its website, not as a live service the app can query. A small job therefore copies them into the site:
+
+1. **What runs it:** GitHub Actions, GitHub's free automation, using `.github/workflows/linz-tides.yml`. It runs at about 4 pm NZ time on the 1st of each month. It also runs whenever that file or the script changes, and whenever you press **Run workflow** on the Actions tab.
+2. **What it does:** `tools/fetch_linz_tides.py` downloads this year's and next year's daily prediction CSV for every LINZ port, plus the LINZ secondary ports table. It converts them to small files in the `tides/` folder and saves them back to the repository. GitHub Pages then publishes them with the site.
+3. **What the app does:** when you set a position, the app reads those files from your own site, finds the nearest LINZ tide point and shows its times and heights. Nothing is downloaded from LINZ at that moment.
+4. **How to check it's working:** the repository has a `tides` folder containing `ports.json` and `secondary.json`, and the Actions tab shows green ticks. A red cross means that month's run failed: open it to see why. The site keeps the previous month's files, which still cover the rest of the year.
+5. **When it needs you:** if LINZ changes its website layout, the job stops with a clear message instead of saving bad data.
 
 ## How the drift is worked out
 
@@ -61,7 +70,7 @@ Every 10 minutes from the last-seen time, the object moves with the surface curr
 ## Updating
 
 - Edit any file on GitHub with the pencil icon, or upload a replacement.
-- After changing any file, also change `sweep-v2` in `sw.js` to the next number (`sweep-v3`, and so on). This makes phones fetch the new version instead of using their saved copy.
+- After changing any file, also change `sweep-v3` in `sw.js` to the next number (`sweep-v4`, and so on). This makes phones fetch the new version instead of using their saved copy.
 
 ## Important
 

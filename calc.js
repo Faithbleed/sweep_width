@@ -149,3 +149,16 @@ export function labelEvents(events) {
     return { t, h, type: h > ref ? "HW" : "LW" };
   });
 }
+
+// Applies LINZ secondary port differences to labelled standard port events (LINZ Nautical Almanac method):
+//   time   = standard time + mean HW or LW time difference
+//   height = (standard height − standard MSL) × range ratio + secondary MSL   (metres above chart datum)
+// Height is null when LINZ gives no height data for the secondary port.
+export function applySecondary(events, s) {
+  const canH = s.msl != null && s.rr != null && s.refMsl != null;
+  return events.map(e => ({
+    type: e.type,
+    t: e.t + (e.type === "HW" ? s.dHW : s.dLW) * 60,
+    h: canH ? (e.h - s.refMsl) * s.rr + s.msl : null
+  })).sort((a, b) => a.t - b.t);
+}

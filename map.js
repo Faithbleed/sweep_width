@@ -153,17 +153,17 @@ async function getJSON(url, signal) {
 async function loadData() {
   const lat = S.lat, lon = S.lon;
   const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
-  if (S.dataKey === key && S.data) { renderDrift(); renderTide(); return; }
+  renderTide();
+  if (S.dataKey === key && S.data) { renderDrift(); return; }
   if (S.loading) S.loading.abort();
   const ac = new AbortController(); S.loading = ac;
   S.data = null; S.dataKey = key;
   driftLayer.clearLayers(); $("drift-out").hidden = true;
-  status("drift", "Loading wind and current forecast…"); status("tide", "Loading tide…");
-  $("model").innerHTML = ""; renderLinz();
+  status("drift", "Loading wind and current forecast…");
   const q = `latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&past_days=2&forecast_days=3&timeformat=unixtime&timezone=GMT`;
   try {
     const [marine, wx] = await Promise.all([
-      getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=ocean_current_velocity,ocean_current_direction,sea_level_height_msl,wave_height`, ac.signal),
+      getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=ocean_current_velocity,ocean_current_direction,wave_height`, ac.signal),
       getJSON(`https://api.open-meteo.com/v1/forecast?${q}&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=ms`, ac.signal)
     ]);
     if (S.dataKey !== key) return;
@@ -183,17 +183,17 @@ async function loadData() {
       const [u, v] = C.toUV(sp * wf, d, false); wind.u.push(u); wind.v.push(v); wind.spd.push(sp * wf);
     });
     S.data = {
-      cur, wind, sea: { t: mh.time, h: mh.sea_level_height_msl }, wave: mh.wave_height,
+      cur, wind, wave: mh.wave_height,
       cellLat: marine.latitude, cellLon: marine.longitude,
       cellNM: C.distanceNM(lat, lon, marine.latitude, marine.longitude),
       noOcean: cur.spd.every(v => v == null)
     };
-    status("drift", ""); status("tide", "");
-    renderDrift(); renderTide();
+    status("drift", "");
+    renderDrift();
   } catch (e) {
     if (e.name === "AbortError") return;
     const msg = `Couldn't load forecast data (${e.message}). Check signal, then tap the point again.`;
-    status("drift", msg, true); status("tide", msg, true);
+    status("drift", msg, true);
   }
 }
 
@@ -288,82 +288,70 @@ function renderDrift() {
   S.fit = false;
 }
 
-// ---------- Tide ----------
+// ---------- Tide (LINZ only) ----------
 function renderTide() {
   if ($("panel-tide").hidden) return;
   renderLinz();
-  renderModel();
 }
 
-function renderModel() {
-  const D = S.data, el = $("model");
-  if (!D) { el.innerHTML = ""; return; }
-  const { t, h } = D.sea;
-  if (h.every(v => v == null)) { el.innerHTML = `<h3>Modelled tide here</h3><div class="sub">No sea-level model data at this point.</div>`; return; }
-  const now = Date.now() / 1000, a = now - 6 * 3600, b = now + 42 * 3600;
-  const idx = t.map((x, i) => i).filter(i => t[i] >= a - 3600 && t[i] <= b + 3600 && h[i] != null);
-  const ts = idx.map(i => t[i]), hs = idx.map(i => h[i]);
-  const ext = C.findExtrema(ts, hs).filter(e => e.t >= a && e.t <= b);
-  const sm = C.sampler(ts, hs), hNow = sm(now)?.[0] ?? null, hSoon = sm(now + 900)?.[0] ?? null;
-  const trend = hNow != null && hSoon != null ? (hSoon > hNow ? "rising" : "falling") : "";
-  // Chart
-  const W = 600, H = 170, pl = 30, pr = 8, pt = 22, pb = 22;
-  const lo = Math.min(...hs) - 0.15, hi = Math.max(...hs) + 0.15;
-  const X = x => pl + (x - a) / (b - a) * (W - pl - pr), Y = y => pt + (hi - y) / (hi - lo) * (H - pt - pb);
-  const pts = ts.map((x, i) => [X(Math.min(b, Math.max(a, x))), Y(hs[i])]);
-  const path = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
-  let grid = "";
-  const tick0 = Math.ceil(a / 21600) * 21600;
-  for (let x = tick0; x <= b; x += 21600) grid += `<line class="grid" x1="${X(x)}" x2="${X(x)}" y1="${pt}" y2="${H - pb}"/><text x="${X(x)}" y="${H - 6}" text-anchor="middle">${fmtTime(x).replace(/ /, " ")}</text>`;
-  for (let y = Math.ceil(lo * 2) / 2; y <= hi; y += 0.5) grid += `<line class="grid" x1="${pl}" x2="${W - pr}" y1="${Y(y)}" y2="${Y(y)}"/><text x="${pl - 4}" y="${Y(y) + 4}" text-anchor="end">${y.toFixed(1)}</text>`;
-  const labs = ext.map(e => `<text class="lab" x="${X(e.t)}" y="${e.type === "HW" ? Y(e.h) - 7 : Y(e.h) + 15}" text-anchor="middle">${fmtClock(e.t)}</text>`).join("");
-  const svg = `<svg class="tchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Modelled tide curve, next 42 hours">${grid}
-    <path class="fill" d="${path} L${pts.at(-1)[0]} ${H - pb} L${pts[0][0]} ${H - pb} Z"/><path class="curve" d="${path}"/>
-    <line class="now" x1="${X(now)}" x2="${X(now)}" y1="${pt - 8}" y2="${H - pb}"/><text x="${X(now)}" y="${pt - 11}" text-anchor="middle" class="lab">now</text>${labs}</svg>`;
-  const evs = ext.slice(0, 6).map(e => `<div class="${e.t < now ? "past" : ""}"><div class="k ${e.type === "HW" ? "hw" : ""}">${e.type === "HW" ? "HIGH" : "LOW"}</div><div class="tm">${fmtClock(e.t)}</div><div class="h">${fmtTime(e.t).split(" ")[0]} · ${e.h >= 0 ? "+" : ""}${e.h.toFixed(2)} m</div></div>`).join("");
-  el.innerHTML = `<h3>Modelled tide at this point</h3>
-    <div class="sub">${hNow != null ? `Now ${hNow >= 0 ? "+" : ""}${hNow.toFixed(2)} m relative to mean sea level, ${trend}.` : ""} Global model on an ~8 km grid. Unreliable inside harbours and inlets. Use for timing, not depth.</div>
-    ${svg}<div class="ev">${evs}</div>`;
+const getJSONCached = (() => {
+  const cache = {};
+  return url => cache[url] || (cache[url] = fetch(url).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .catch(e => { delete cache[url]; throw e; }));
+})();
+
+// Picks the nearest LINZ place: a port with its own daily predictions, or a secondary port worked from its standard port.
+async function nearestTidePlace(lat, lon) {
+  const ports = await getJSONCached("tides/ports.json");
+  let secs = [];
+  try { secs = (await getJSONCached("tides/secondary.json")).ports || []; } catch (e) {}
+  const full = ports.map(p => ({ kind: "port", p, d: C.distanceNM(lat, lon, p.lat, p.lon) })).sort((a, b) => a.d - b.d)[0];
+  const sec = secs.map(p => ({ kind: "sec", p, d: C.distanceNM(lat, lon, p.lat, p.lon) })).sort((a, b) => a.d - b.d)[0];
+  // Prefer a port's own daily predictions unless a secondary port is clearly closer (secondary positions are to the nearest minute).
+  return sec && sec.d + 1 < full.d ? sec : full;
 }
 
-let portsPromise = null;
-function loadPorts() {
-  if (!portsPromise) portsPromise = fetch("tides/ports.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).catch(e => { portsPromise = null; throw e; });
-  return portsPromise;
-}
-const portCache = {};
 async function renderLinz() {
   const el = $("linz");
   if (S.lat == null) { el.innerHTML = ""; return; }
   const lat = S.lat, lon = S.lon;
-  let ports;
-  try { ports = await loadPorts(); }
+  let near;
+  try { near = await nearestTidePlace(lat, lon); }
   catch (e) {
-    el.innerHTML = `<h3>Official LINZ tide</h3><div class="sub">Official port predictions aren't loaded on this site yet. See the <a href="https://www.linz.govt.nz/products-services/tides-and-tidal-streams/tide-predictions" target="_blank" rel="noopener">LINZ tide predictions</a> page.</div>`;
+    el.innerHTML = `<h3>LINZ tide</h3><div class="sub">Official LINZ tide predictions aren't loaded on this site yet, so no tide times can be shown. Use the <a href="https://www.linz.govt.nz/products-services/tides-and-tidal-streams/tide-predictions" target="_blank" rel="noopener">LINZ tide predictions</a> page.</div>`;
     return;
   }
   if (S.lat !== lat || S.lon !== lon) return;
-  const near = ports.map(p => ({ p, d: C.distanceNM(lat, lon, p.lat, p.lon) })).sort((x, y) => x.d - y.d)[0];
-  const P = near.p;
+  const P = near.p, isSec = near.kind === "sec";
+  const slug = isSec ? P.refSlug : P.slug;
   try {
-    const data = portCache[P.slug] || (portCache[P.slug] = await fetch(`tides/${P.slug}.json`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }));
+    const data = await getJSONCached(`tides/${slug}.json`);
     if (S.lat !== lat || S.lon !== lon) return;
     const now = Date.now() / 1000;
-    const all = C.labelEvents(data.events);
+    let all = C.labelEvents(data.events);
+    if (isSec) all = C.applySecondary(all, P);
     let i = all.findIndex(e => e.t > now); if (i < 0) i = all.length;
     const show = all.slice(Math.max(0, i - 1), i + 5);
-    const tz = P.tz;
+    const tz = P.tz || data.tz;
     const nxt = all[i];
-    const stage = nxt ? (nxt.type === "HW" ? "Rising" : "Falling") + `, ${nxt.type === "HW" ? "high" : "low"} water at ${fmtClock(nxt.t, tz)}` : "";
+    const stage = nxt ? `${nxt.type === "HW" ? "Rising" : "Falling"}, ${nxt.type === "HW" ? "high" : "low"} water at ${fmtClock(nxt.t, tz)}.` : "";
+    const sgn = m => (m < 0 ? "−" : "+") + Math.abs(m) + " min";
+    const how = isSec
+      ? `LINZ secondary port, worked from ${P.ref} predictions with LINZ differences (high water ${sgn(P.dHW)}, low water ${sgn(P.dLW)}${P.rr != null ? `, range ratio ${P.rr}` : ""}).`
+      : `LINZ daily predictions for this port.`;
     const yr = new Intl.DateTimeFormat("en-NZ", { timeZone: tz, year: "numeric" }).format(new Date());
-    const pdf = P.pdf && (P.pdf[yr] || Object.values(P.pdf)[0]);
-    el.innerHTML = `<h3>Official LINZ tide · ${P.name}</h3>
-      <div class="sub">Nearest standard port, ${near.d.toFixed(0)} NM ${C.fmtBrg(C.bearingDeg(lat, lon, P.lat, P.lon))} from the LKP. ${stage}. Heights above chart datum, port local time.</div>
-      ${near.d > 20 ? `<div class="warnline">The port is ${near.d.toFixed(0)} NM away. Tide times at the LKP can differ. Check the secondary port offsets in the LINZ tables.</div>` : ""}
-      <div class="ev">${show.map(e => `<div class="${e.t < now ? "past" : ""}"><div class="k ${e.type === "HW" ? "hw" : ""}">${e.type === "HW" ? "HIGH" : "LOW"}</div><div class="tm">${fmtClock(e.t, tz)}</div><div class="h">${fmtTime(e.t, tz).split(" ")[0]} · ${e.h.toFixed(1)} m</div></div>`).join("")}</div>
+    const pdfPort = isSec ? null : P;
+    const pdf = pdfPort && pdfPort.pdf && (pdfPort.pdf[yr] || Object.values(pdfPort.pdf)[0]);
+    const hasH = all.some(e => e.h != null);
+    el.innerHTML = `<h3>LINZ tide · ${P.name}</h3>
+      <div class="sub">${near.d.toFixed(near.d < 10 ? 1 : 0)} NM ${C.fmtBrg(C.bearingDeg(lat, lon, P.lat, P.lon))} from the LKP. ${stage}</div>
+      <div class="sub">${how} ${hasH ? "Heights above chart datum." : "LINZ gives no height data for this port."} Port local time.</div>
+      ${P.approx ? `<div class="warnline">LINZ marks this port's data as approximate.</div>` : ""}
+      ${near.d > 10 ? `<div class="warnline">The nearest LINZ tide point is ${near.d.toFixed(0)} NM away, so times at the LKP may differ.</div>` : ""}
+      <div class="ev">${show.map(e => `<div class="${e.t < now ? "past" : ""}"><div class="k ${e.type === "HW" ? "hw" : ""}">${e.type === "HW" ? "HIGH" : "LOW"}</div><div class="tm">${fmtClock(e.t, tz)}</div><div class="h">${fmtTime(e.t, tz).split(" ")[0]}${e.h != null ? ` · ${e.h.toFixed(1)} m` : ""}</div></div>`).join("")}</div>
       ${pdf ? `<div class="sub" style="margin-top:6px"><a href="${pdf}" target="_blank" rel="noopener">Full ${yr} LINZ tide table for ${P.name} (PDF)</a></div>` : ""}`;
   } catch (e) {
-    el.innerHTML = `<h3>Official LINZ tide · ${P.name}</h3><div class="sub">Couldn't load the predictions for this port. Check signal and try again.</div>`;
+    el.innerHTML = `<h3>LINZ tide · ${P.name}</h3><div class="sub">Couldn't load the predictions. Check signal and try again.</div>`;
   }
 }
 

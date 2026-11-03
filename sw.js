@@ -1,6 +1,6 @@
 // Offline cache for Helo Sweep Width. Bump VERSION whenever you change any file
 // so everyone's phone picks up the new copy.
-const VERSION = "sweep-v2";
+const VERSION = "sweep-v3";
 const FILES = [
   "./", "index.html", "map.html", "map.css", "map.js", "calc.js", "leeway.js", "config.js",
   "vendor/leaflet.esm.js", "vendor/leaflet.css",
